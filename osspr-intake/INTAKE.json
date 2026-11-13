@@ -1,0 +1,38 @@
+[
+  {
+    "upstream_repo": "SheffieldML/GPy",
+    "head_sha": "dc38124abf746b98a61a9b65ca06033193dc2eb8",
+    "file": "GPy/kern/src/stationary.py",
+    "function": "GPy.kern.src.stationary.Stationary._unscaled_dist",
+    "native_test_cmd": "python -m pytest GPy/testing/test_kernel.py",
+    "bench_cmd": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python osspr-intake/harness/stationary_unscaled_dist.py",
+    "baseline_median_ms": 84.293,
+    "baseline_noise_pct": 35.56,
+    "tests_pass_on_baseline": true,
+    "why": "RBF, Matern, and the other stationary kernels build every training covariance through the symmetric (X2 is None) path. On 2000 by 8 inputs that path spends most of its time in tdot, which is much slower than a GEMM at this shape, then np.clip copies the full matrix. An np.dot plus an in-place square root matched within 2e-15 and was 3.8x faster on the same draws (median about 22 ms versus 84 ms). The call-to-call spread is large because the routine is memory-bound on one core, and it is still well under that speedup."
+  },
+  {
+    "upstream_repo": "SheffieldML/GPy",
+    "head_sha": "dc38124abf746b98a61a9b65ca06033193dc2eb8",
+    "file": "GPy/likelihoods/likelihood.py",
+    "function": "GPy.likelihoods.likelihood.Likelihood.ep_gradients",
+    "native_test_cmd": "python -m pytest GPy/testing/test_likelihood.py GPy/testing/test_inference.py",
+    "bench_cmd": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python osspr-intake/harness/ep_gradients.py",
+    "baseline_median_ms": 29.753,
+    "baseline_noise_pct": 3.09,
+    "tests_pass_on_baseline": true,
+    "why": "Expectation propagation calls this with quad_mode='gh' on every likelihood-parameter step for Student-T, Gamma, and any other likelihood that does not override it. It maps a 32-point Gauss-Hermite integral, including a Python elementwise product, across observations. Applying the same nodes to all 800 rows at once matched the scalar result to about 4e-15 and cut the median from 30 ms to about 0.5 ms."
+  },
+  {
+    "upstream_repo": "SheffieldML/GPy",
+    "head_sha": "dc38124abf746b98a61a9b65ca06033193dc2eb8",
+    "file": "GPy/likelihoods/student_t.py",
+    "function": "GPy.likelihoods.student_t.StudentT.predictive_variance",
+    "native_test_cmd": "python -m pytest GPy/testing/test_likelihood.py",
+    "bench_cmd": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python osspr-intake/harness/student_t_predictive_variance.py",
+    "baseline_median_ms": 22.231,
+    "baseline_noise_pct": 7.04,
+    "tests_pass_on_baseline": true,
+    "why": "Diagonal Student-T prediction (GP.predict, full_cov=False) ends here. For nu>2 and the identity link the observation variance is Var(f) + sigma^2 * nu / (nu - 2), which test_likelihood already checks at rtol 1e-6, but the method still runs three scipy.quad integrations per test point. On 32 points the quadrature result is within 2e-9 of that closed form, so almost all of the 22 ms is avoidable."
+  }
+]
